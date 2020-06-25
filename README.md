@@ -43,9 +43,9 @@ Then, activate the environment:
 conda activate fluid_tobs
 ```
 
-In order to run the basic simulation type in your conda environment:
+In order to run the basic simulation with a range of parameters according to ```parametros``` file, just type in your conda environment:
 ```
-python stokes_tobs.py
+bash run.sh
 ```
 
 ## The results:
