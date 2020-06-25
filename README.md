@@ -51,7 +51,7 @@ python stokes_tobs.py
 ## The results:
 
 Some examples can be seen in the example folder in the root direcotry and they look like following:
-![Alt Text](examples/quadro_exemplo.gif)
+![Alt Text](examples/quadro_exemplo.png)
 
 ## Publications:
 
