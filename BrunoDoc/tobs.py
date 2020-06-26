@@ -105,10 +105,6 @@ class TobsObj():
             # set_working_tape(Tape())
             self.jd = self.dobj_fun(self.control)
             self.j = self.obj_fun(self.control)
-            # if pesq > 3:
-            # if self.j_previous is None: self.j_previous = self.j
-            # if self.j/self.j_previous > 50:
-            #     flip_limits /= 10
             self.cs = self.cst_fun(self.control)
             self.jac = self.jac_fun(self.control)
             self.reshape_to_matlab()
@@ -116,20 +112,6 @@ class TobsObj():
             # ep = 0.00001 # 12
             ep = 0.02 # 12
             self.epsilons = np.array([ep, ep, ep, ep]) #O benchmarking estava em 0.2
-            '''if self.iteration >= 2 and self.j > self.j_previous:
-                print("o j atual")
-                print(self.j)
-                print("")
-                print("o j anterior")
-                print(self.j_previous)
-                self.epsilons = np.array([0.005, 0.01, 0.005]) #O benchmarking estava em 0.2
-                flip_limits = 0
-                import pdb; pdb.set_trace()'''
-            # self.epsilons = np.array([0.005, 0.005, 0.005])
-            # self.epsilons = np.array([0.001, 0.001, 0.001])
-
-            # self.volume_constraint = np.array([0.5])
-            # self.epsilons = np.array([0.2])
             ans = octave.tobs_from_matlab(
                     self.nvar,
                     self.x_L,
@@ -169,11 +151,6 @@ class TobsObj():
             # rho.vector().set_local(np.array(design_variables)) # achava q era esse
 
             rho_notfiltered = rho.copy(deepcopy=True)
-            '''if filter_fun is not None:
-                rho = filter_fun(rho)# FIXME ta com filtro mas sem adjunto'''
-
-            '''if self.iteration % 1000 == 0:
-                mesh_adapted, domain= sm.generate_polygon(rho, accept_holes=False)'''
 
             # call_back(rho, rho_notfiltered, mesh_adapted, domain, self.iteration)
             call_back(rho, rho_notfiltered, None, None, self.iteration)
@@ -188,10 +165,5 @@ class TobsObj():
                 pass
             self.iteration += 1
             self.jd_previous = self.jd
-            # if self.j_previous is not None and self.j_previous/self.j >= 10:
             self.j_previous = self.j
-
-            # new_mesh_refined, domain = sm.generate_polygon_refined(control, mesh)
-            # file_new_mesh_refined << new_mesh_refined
-            # file_regions << domain
 

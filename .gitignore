@@ -21,3 +21,8 @@ comp_temp*/
 log*
 config2/
 tradicionais/
+*.vtu
+*.pvd
+*.csv
+*.png
+sensitivity/

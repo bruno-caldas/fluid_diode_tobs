@@ -35,53 +35,6 @@ class FP(BProp.PP):
         # self.w = self.get_forward_solution()
         return
 
-    def density_filter(self, rho_nf):
-        mtrial = TrialFunction(self.A )
-        mtresp = Function(self.A )
-        m_test = TestFunction(self.A )
-        n = FacetNormal(self.mesh)
-        ds = Measure('ds', domain = self.mesh)
-        eq_l = (
-                (self.r_min**2)*inner(grad(mtrial), grad(m_test)) *dx# * 2 * pi * self.r_n * dx
-                + mtrial*m_test*dx - (rho_nf)*m_test *dx# * 2 * pi * self.r_n * dx
-                # -self.r_min**2*inner(n , grad(mtrial))*m_test*ds
-                )
-        solve(lhs(eq_l)== rhs(eq_l), mtresp )
-
-        # mtresp_rounded = np.clip(np.array(mtresp.vector()).round(0), a_min = 0, a_max = 1)
-        # rho_nf.vector().set_local(mtresp_rounded)
-
-        # rho_nf.rename("controlNotFiltered", "controlNotFiltered")
-        # self.file_out << rho_nf
-        vetor_rho = np.array(mtresp.vector())
-
-        # vetor_rho = np.array([0 if item<0.5 else 1 for item in vetor_rho])
-        vetor_rho = np.array([item if item<0.5 else item for item in vetor_rho])
-        rho_nf.vector().set_local(vetor_rho)
-
-        # Set up a vertex_2_dof list
-        dofmap = self.A.dofmap()
-        nvertices = self.mesh.ufl_cell().num_vertices()
-        indices = [dofmap.tabulate_entity_dofs(0, i)[0] for i in range(nvertices)]
-        vertex_2_dof = dict()
-        [vertex_2_dof.update(dict(vd for vd in zip(cell.entities(0),
-                                                dofmap.cell_dofs(cell.index())[indices])))
-                                for cell in cells(self.mesh)]
-        '''index_to_change = np.where(
-                (self.mesh.coordinates()[:,0]<gap) |
-                (self.mesh.coordinates()[:,1]>radius+altura-gap) |
-                (self.mesh.coordinates()[:,0]>delta-gap)
-                )[0]
-        for i in index_to_change:
-            dof_idx = vertex_2_dof[i]
-            rho_nf.vector()[dof_idx] = 1'''
-
-        rho_nf.rename("Controlfiltered", "Controlfiltered")
-        self.filter_file << rho_nf
-        # import pdb; pdb.set_trace()
-        return rho_nf
-
-
     def get_forward_solution(self, rho, save_results):
         #Fe.set_log_level(30)
 

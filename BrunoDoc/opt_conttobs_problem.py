@@ -64,11 +64,6 @@ class OP(AProb.AP):
         ds_vars = self.rho
         return ds_vars
 
-        '''    def __vf_fun_var_assem__(self):
-        rho_tst   = TestFunction(self.rho.function_space())
-        self.vol_xi  = assemble(rho_tst * Constant(1) * dx)
-        self.vol_sum = self.vol_xi.sum()'''
-
     def __vf_fun_var_assem__(self):
         self.rho_tst   = TestFunction(self.rho.function_space())
         self.vol_xi  = assemble(self.rho_tst * Constant(1) * dx)
@@ -90,13 +85,9 @@ class OP(AProb.AP):
         print(" \n **********************************" )
         print(" Objective Function Evaluation" )
         ds_vars = self.__check_ds_vars__(rho)
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars) #, self.state, self.state2)
+        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars)
         if assemble(funcional2) == 0: fval = 0
-        # else: fval = 2. * math.log(assemble(funcional)) - 1*math.log(assemble(funcional2))
         fval = assemble(funcional1) / assemble(funcional2) + assemble(Fstar)
-        # FIXME
-        # fval = assemble(funcional1) / assemble(funcional2)
-        # fval *= -1
         print(" fval: {}" .format(fval) )
         print(" ********************************** \n " )
         self.iter_fobj += 1
@@ -130,9 +121,10 @@ class OP(AProb.AP):
         return fval# , borda_e
 
     def obj_dfun(self, xi, user_data=None):
-        '''if iter_dobj == 0:
+        '''if self.iter_dobj == 0:
             error = self.test_obj_dfun(xi)
-            if error > .10: raise Exception("Error too big in the functional gradient!")'''
+            for err in error:
+                if err > .10: print("Warning: Error too big in the functional gradient!")'''
 
         print(" \n **********************************" )
         print(" \n Objective Function Gradient Evaluation \n" )
@@ -164,9 +156,8 @@ class OP(AProb.AP):
         # else: L = 2 * L1/fval2 - 1 * L2/fval2
         else:
             L = L1/fval2 - 1 *fval1/fval2**2 * L2 + L3
-        # FIXME
         L = L1/fval2 - 1 *fval1/fval2**2 * L2 + L3
-        L = L / (delta*altura + 2*0.5*1)
+        # L = L / (delta*altura + 2*0.5*1)
 
         sensibility = ds_vars.copy(deepcopy=True)
         sensibility.vector().set_local(L)
@@ -180,7 +171,7 @@ class OP(AProb.AP):
         sensibility.rename("Sensitivity", "Sensitivity")
         self.file_sen << sensibility
         L = numpy.array(sensibility.vector())
-        # L /= numpy.absolute(L).min()
+        # L /= numpy.absolute(L).max()
 
         self.file_deriv = open(self.workdir + "/derivada_cont.txt", "a+")
         if self.first_iter_deriv:
@@ -196,52 +187,64 @@ class OP(AProb.AP):
         return L
 
     def test_obj_dfun(self, xi, user_data=None):
-        ds_vars_original  = self.__check_ds_vars__(xi)
+        ds_vars = self.__check_ds_vars__(xi)
 
-        ds_vars = ds_vars_original.copy(deepcopy=True)
-        ds_vars.vector()[:] = 1
-
-        # mesh = ds_vars.function_space().mesh()
-        # filter_f = filter_obj(mesh, rmin=0.2, beta=2)
-        # ds_vars = filter_f.Rho_elem(ds_vars)
+        mesh = ds_vars.function_space().mesh()
 
         ds_vars.rename("ControlFiltered", "ControlFiltered")
 
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False) #, self.state, self.state2)
-        w3 = w2.copy(deepcopy=True)
+        random_cells = numpy.random.randint(10, size=(1600))
+        # random_cells = [*range(1600)]
+        self.file_analise = open(self.workdir + "/analise.txt", "a+")
+        self.file_analise.write(' \t Point Number\tFinite Diference\tSensibility\tError\n')
 
+        ds_vars.vector()[:] = 1
+        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False)
+        w3 = w2.copy(deepcopy=True)
         lam1 = self.get_adjoint_solution(ds_vars, w)
         lam2 = self.get_adjoint_solution2(ds_vars, w2)
         lam3 = self.get_adjoint_solution3(ds_vars, w3)
-
         fval1 = assemble(funcional1)
         fval2 = assemble(funcional2)
         fval3 = assemble(Fstar)
-        L1 = numpy.array(lam1)
-        L2 = numpy.array(lam2)
-        L3 = numpy.array(lam3)
-
         fval_0 = fval1/fval2 + fval3
-        L = L1/fval2 - 1 *fval1/fval2**2 * L2 + L3
-        L = L / (delta*altura + 2*0.5*1)
 
-        delta_ds_vars = 1e-5
-        ds_vars.vector()[:] = 1 - delta_ds_vars
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False)
-        w3 = w2.copy(deepcopy=True)
-        fval1 = assemble(funcional1)
-        fval2 = assemble(funcional2)
-        fval3 = assemble(Fstar)
+        L = lam1/fval2 - 1 *fval1/fval2**2 * lam2 + lam3
 
-        fval = fval1/fval2 + fval3
-        finite_diference = (fval_0 - fval)/ (delta_ds_vars * (delta*altura + 2*0.5*1))
-        error = (finite_diference-L.sum())/L.sum()
-        self.file_analise = open(self.workdir + "/analise.txt", "a+")
-        self.file_analise.write(str(fval) + '\t' +str(fval_0) + '\t' + \
-                str(finite_diference) + '\t' + str(L.sum()) + '\t' + str(error) + '\n')
+        '''a = TrialFunction(ds_vars.function_space())
+        b = TestFunction(ds_vars.function_space())
+        M = assemble(inner(a, b)*dx)
+        dL2 = Function(ds_vars.function_space(), name="deriv")
+        solve(M, dL2.vector(), L)
+        L = numpy.array(dL2.vector()) * .03333333**2'''
+        L = numpy.array(L)
+
+        error_cells = []
+        sens = ds_vars.copy(deepcopy=True)
+        sens.vector()[:] = 0
+        delta_ds_vars = 1e-7
+        file_teste = File(self.workdir + "/sens_error.pvd")
+        for rcell in random_cells:
+            ds_vars.vector()[rcell] = 1 - delta_ds_vars
+            funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False)
+            fval1 = assemble(funcional1)
+            fval2 = assemble(funcional2)
+            fval3 = assemble(Fstar)
+            fval_1 = fval1/fval2 + fval3
+
+            finite_diference = (fval_0 - fval_1) / delta_ds_vars
+            error = (finite_diference-L[rcell])/L[rcell]
+            self.file_analise.write('Point ID:\t' +str(rcell) + '\t' + \
+                    str(finite_diference) + '\t' + str(L[rcell]) + '\t' + str(error) + '\n')
+            ds_vars.vector()[:] = 1
+            error_cells.append(error)
+            sens.vector()[rcell] = finite_diference
+            file_teste << sens
+
         self.file_analise.close()
 
-        return error
+        import pdb;pdb.set_trace()
+        return error_cells
 
     def add_volf_constraint(self, upp, lwr):
         self.cst_U.append(upp)
@@ -338,9 +341,6 @@ class OP(AProb.AP):
                 dfval = numpy.array([ self.volfrac_dfun(), self.volfrac_dfun2(), self.volfrac_dfun2(), self.volfrac_dfun3() ])
 
         return dfval
-    """def jacobian(self, xi):
-        jacobiano = (-self.malhavol_vol_xi, -self.malhavol_vol_xi2)
-        return jacobiano"""
 
     def sim(self, max_iter=1000):
         """
@@ -400,6 +400,6 @@ class OP(AProb.AP):
 
         self.file_mesh_adapted << self.rho.function_space().mesh()
         self.rho.full_geo = self.full_geo
-        OptObj.solve(self.rho, minimize=self.minimize, filter_fun=self.density_filter, call_back=cb_post)
+        OptObj.solve(self.rho, minimize=self.minimize, filter_fun=None, call_back=cb_post)
         return self.rho
 
