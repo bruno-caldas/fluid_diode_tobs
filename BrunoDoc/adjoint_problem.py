@@ -14,7 +14,7 @@ if linha[9][:2].upper() == 'DA': from dolfin_adjoint import *
 delta = float(linha[2])
 gap = float(linha[3])
 radius = float(linha[4])
-altura = 1.5
+altura = 2.0
 
 Reynolds = 300
 v_average = Reynolds / (2*gap)
@@ -34,45 +34,42 @@ class AP(FProb.FP):
 
 
         w = self.get_forward_solution(rho, save_results)
-        w2 = self.get_forward_solution2(rho, save_results)
         (u, p) = split(w)
-        (u2, p2) = split(w)
         # (u, p) = w.split()
         # (u2, p2) = w2.split()
 
         # Absoluto COM KVV
-        funcional1 = 1*(  inner(self.alpha(rho) * u, u) \
+        '''self.funcional1 = 1*(  inner(self.alpha(rho) * u, u) \
             +  0.5 * AP.mu *(
                 inner(grad(u) + grad(u).T, grad(u) + grad(u).T)
+                # (u[1].dx(0)-u[0].dx(1))**2
+                # inner(curl(u), curl(u))
                 ) \
-            # - inner(self.alpha(rho), (self.r_n-self.radius)**4) \
             )
-        funcional2 = 1* (  inner(self.alpha(rho) * u2, u2) \
-            +  0.5 * AP.mu * (
-                inner(grad(u2) + grad(u2).T, grad(u2) + grad(u2).T)
-                )\
-            )
+        '''
 
-        Fstar = WF/(2*gap)**2 * self.alpha(rho) * inner(u2,u2)/(self.alphabar *v_average)
+        facet_marker = MeshFunction("size_t", self.mesh, self.mesh.topology().dim() - 1)
+        facet_marker.set_all(0)
+        self.direita.mark(facet_marker,2)
+        File("bru.pvd") << facet_marker
+        dss = Measure("ds",domain=self.mesh,subdomain_data=facet_marker)
+        ud = as_vector((102/2, 0))
+        self.funcional1 = (
+                inner(curl(u), curl(u))*dx
+                # + inner((u - ud),(u - ud))*dss(2)
+                )
 
-        visc_term1 = 0.5 * AP.mu * inner(grad(u), grad(u))* dx
-        visc_term2 = 0.5 * AP.mu * inner(grad(u2), grad(u2))* dx
+        # self.funcional1 *= dx
 
-        funcional1 *= dx
-        funcional2 *= dx
-        Fstar *= dx
-
-        return funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2
+        # return funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2
+        return self.funcional1, w
 
     def get_adjoint_solution(self, rho, w):
 
         # w = self.get_forward_solution(rho)
 
         bc_hom = self.boundaries_cond()
-        # self.bc_hom[0].homogenize() # adjoint has homogeneous BCs #FIXME: REVER A BAGA
         bc_hom[0].homogenize() # adjoint has homogeneous BCs #FIXME: REVER A BAGA
-        bc_hom[1].homogenize() # adjoint has homogeneous BCs #FIXME: REVER A BAGA
-        bc_hom[2].homogenize() # adjoint has homogeneous BCs #FIXME: REVER A BAGA
 
         adj = Function(self.W)
         adj_t = TrialFunction(self.W)
@@ -90,17 +87,26 @@ class AP(FProb.FP):
                 + inner(grad(p_ad_t), v_ad) \
                 )*dx
 
-        '''dJdu = derivative(self.funcional1, w) #FIXME
+        # dJdu = derivative(self.funcional1, w) #FIXME
+        facet_marker = MeshFunction("size_t", self.mesh, self.mesh.topology().dim() - 1)
+        facet_marker.set_all(0)
+        self.direita.mark(facet_marker,2)
+        dss = Measure("ds",domain=self.mesh,subdomain_data=facet_marker)
+        ud = as_vector((102/2, 0))
+        dJdu = (
+                2. * inner(curl(u), curl(v_ad))*dx
+                #+ 2. * inner(v_ad, u - ud) * dss(2)
+                )
         '''
         dJdu = 1 *(
-                2*self.alpha(rho) * inner(u, v_ad)* dx
+                # 2*self.alpha(rho) * inner(u, v_ad)* dx
                 + 0.5*(
                     inner(grad(u), grad(v_ad)) * dx
                     + inner(grad(u).T, grad(v_ad)) * dx
                     + inner(grad(u), grad(v_ad).T) * dx
                     + inner(grad(u).T, grad(v_ad).T) * dx
                     )
-                )
+                )'''
                 # inner(grad(u), grad(v_ad)) * dx + 2*self.alpha(rho) * inner(u, v_ad)* dx
         solve( F_ad == dJdu , adj, bc_hom)
 
@@ -111,100 +117,9 @@ class AP(FProb.FP):
 
         dmo = TestFunction( rho.function_space() )
 
-        dJdm = (-1.*self.alphadash(rho)*inner(u,adj_u) + self.alphadash(rho)*inner(u,u))*dmo*dx
+        # dJdm = (-1.*self.alphadash(rho)*inner(u,adj_u) + self.alphadash(rho)*inner(u,u))*dmo*dx
+        dJdm = -1.*self.alphadash(rho)*inner(u,adj_u) *dmo*dx
         adjfinal_1_resp = assemble(dJdm)
 
         return adjfinal_1_resp
-
-    def get_adjoint_solution2(self, rho, w2):
-
-        # w2 = self.get_forward_solution2(rho)
-
-        bc_hom2 = self.boundaries_cond2()
-        bc_hom2[0].homogenize() # adjoint has homogeneous BCs
-        bc_hom2[1].homogenize() # adjoint has homogeneous BCs
-        bc_hom2[2].homogenize() # adjoint has homogeneous BCs
-        # self.bc_hom2[1].homogenize() # adjoint has homogeneous BCs
-        adj2 = Function(self.W2)
-        adj_t2 = TrialFunction(self.W2)
-        (u_ad_t2, p_ad_t2) = split(adj_t2)
-        adj_tst2 = TestFunction(self.W2)
-        (v_ad2, q_ad2) = split(adj_tst2)
-        (u2, p2) = split(w2)
-
-        F_ad2 = (
-                inner(div(u_ad_t2), q_ad2) \
-                + inner(grad(u_ad_t2), grad(v_ad2)) \
-                - inner(grad(u_ad_t2)*u2, v_ad2) \
-                + inner(grad(u2).T* u_ad_t2, v_ad2) \
-                + self.alpha(rho) * inner(u_ad_t2, v_ad2) \
-                + inner(grad(p_ad_t2), v_ad2) \
-                )*dx
-        dJdu2 = (
-                2*self.alpha(rho) * inner(u2, v_ad2)* dx
-                + 0.5*(
-                    inner(grad(u2), grad(v_ad2)) * dx
-                    + inner(grad(u2).T, grad(v_ad2)) * dx
-                    + inner(grad(u2), grad(v_ad2).T) * dx
-                    + inner(grad(u2).T, grad(v_ad2).T) * dx
-                    )
-                )
-                # inner(grad(u2), grad(v_ad2)) * dx + 2*self.alpha(rho) * inner(u2, v_ad2)* dx
-        solve( F_ad2 == dJdu2 , adj2, bc_hom2)
-
-        # rho = self.density_filter(rho)
-
-        adj_u2, adj_p2 = split(adj2)
-        adj_u_r = adj_u2
-
-        dmo = TestFunction( rho.function_space() )
-
-        # dJdm2 = (-1.*self.alphaJdash(rho)*inner(u2,adj_u2) + self.alphaJdash(rho)*inner(u2,u2))*dmo*dx
-        dJdm2 = (-1.*self.alphadash(rho)*inner(u2,adj_u2) + self.alphadash(rho)*inner(u2,u2))*dmo*dx
-        adjfinal_2_resp = assemble(dJdm2)
-
-        return adjfinal_2_resp
-
-
-    def get_adjoint_solution3(self, rho, w2):
-
-        # w2 = self.get_forward_solution2(rho, save_results=False)
-
-        bc_hom2 = self.boundaries_cond2()
-        bc_hom2[0].homogenize() # adjoint has homogeneous BCs
-        bc_hom2[1].homogenize() # adjoint has homogeneous BCs
-        bc_hom2[2].homogenize() # adjoint has homogeneous BCs
-        # self.bc_hom2[1].homogenize() # adjoint has homogeneous BCs
-        adj2 = Function(self.W2)
-        adj_t2 = TrialFunction(self.W2)
-        (u_ad_t2, p_ad_t2) = split(adj_t2)
-        adj_tst2 = TestFunction(self.W2)
-        (v_ad2, q_ad2) = split(adj_tst2)
-        (u2, p2) = split(w2)
-
-        F_ad2 = (
-                inner(div(u_ad_t2), q_ad2) \
-                + inner(grad(u_ad_t2), grad(v_ad2)) \
-                - inner(grad(u_ad_t2)*u2, v_ad2) \
-                + inner(grad(u2).T* u_ad_t2, v_ad2) \
-                + self.alpha(rho) * inner(u_ad_t2, v_ad2) \
-                + inner(grad(p_ad_t2), v_ad2) \
-                )*dx
-        dJdu3 = (
-                2 * WF/(2*gap)**2 * self.alpha(rho) * inner(u2,v_ad2)/(self.alphabar *v_average)*dx
-                )
-        solve( F_ad2 == dJdu3 , adj2, bc_hom2)
-
-        # rho = self.density_filter(rho)
-
-        adj_u2, adj_p2 = split(adj2)
-
-        dmo = TestFunction( rho.function_space() )
-
-        adjfinal_2_resp = adj_u2
-        dJdm3 = (-1.*self.alphadash(rho)*inner(u2,adj_u2) + WF/(2*gap)**2 * self.alphadash(rho) * inner(u2,u2)/(self.alphabar *v_average))*dmo*dx
-        adjfinal_3_resp = assemble(dJdm3)
-
-        return adjfinal_3_resp
-
 

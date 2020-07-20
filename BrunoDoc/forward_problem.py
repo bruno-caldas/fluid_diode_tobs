@@ -13,7 +13,7 @@ if linha[9][:2].upper() == 'DA': from dolfin_adjoint import *
 delta = float(linha[2])
 gap = float(linha[3])
 radius = float(linha[4])
-altura = 1.5
+altura = 2.0
 
 class FP(BProp.PP):
     """
@@ -87,8 +87,20 @@ class FP(BProp.PP):
                 if linha[9].upper() == 'DA' and valor_mu == self.seq_mu[-1]: set_working_tape(Tape()) ;print("LIMPOU A FITA")
                 if self.anotar: solver.solve()
                 else: solver.solve(annotate=False)
+        '''
 
-        self.w2_old = self.w2
+        (u, p) = TrialFunctions(self.W)
+        F = self.alpha(rho) * inner(u, v) * dx \
+                + self.mu*inner(grad(u)+grad(u).T, grad(v)) * dx \
+                + inner(grad(p), v) * dx  \
+                + inner(div(u), q) * dx
+        problem = LinearVariationalProblem(lhs(F), rhs(F), self.w, BondConditions)
+        solver = LinearVariationalSolver(problem)
+        prm=solver.parameters
+        prm['linear_solver'] = 'mumps'
+        solver.solve()'''
+
+
         (u, p) = self.w.split()
         u.rename("velocidade", "conforme_tempo")
         p.rename("pressao", "conforme_tempo")
@@ -99,51 +111,3 @@ class FP(BProp.PP):
         self.w_old = self.w
         return self.w
 
-    def get_forward_solution2(self, rho, save_results=True):
-        BondConditions2 = self.boundaries_cond2()
-
-        if self.forward_problem == '2D':
-            (u2, p2) = split(self.w2)
-            (v2, q2) = TestFunctions(self.W2)
-            epsilon2 = sym(grad(u2))
-            F2 = (self.alpha(rho) * inner(u2, v2) * dx \
-                + self.mu*inner(grad(u2), grad(v2)) * dx \
-                - div(v2)*p2* dx  \
-                - inner(div(u2), q2) * dx) \
-                + inner(epsilon2*u2,v2) * dx
-            #Fe.solve(F2 == 0, self.w2, BondConditions2)
-            Jacob2 = derivative(F2, self.w2)
-            problem2 = NonlinearVariationalProblem(F2, self.w2, BondConditions2, Jacob2)
-            solver2 = NonlinearVariationalSolver(problem2)
-
-        prm2 = solver2.parameters
-        prm2['newton_solver']['absolute_tolerance'] = 1E-7
-        prm2['newton_solver']['relative_tolerance'] = 1E-9
-        prm2['newton_solver']['maximum_iterations'] = 2000
-        prm2['newton_solver']['relaxation_parameter'] = 1.0
-        for valor_mu in self.seq_mu:
-            try:
-                self.mu.assign(valor_mu)
-                print("VOLTA - Resolvendo valor de mu {}".format(float(self.mu)))
-                print("VOLTA - Resolvendo valor de kmax {}".format(float(self.alphabar)))
-                if linha[9].upper() == 'DA' and valor_mu == self.seq_mu[-1]: set_working_tape(Tape()) ;print("LIMPOU A FITA")
-                if self.anotar: solver2.solve()
-                else: solver2.solve(annotate=False)
-            except:
-                print("ENTROU NO SEGUNDO EXCEPT")
-                prm2['newton_solver']['maximum_iterations'] = 500
-                prm2['newton_solver']['relaxation_parameter'] = 0.3
-                prm2['newton_solver']['absolute_tolerance'] = 1E-6
-                if linha[9].upper() == 'DA' and valor_mu == self.seq_mu[-1]: set_working_tape(Tape()) ;print("LIMPOU A FITA")
-                if self.anotar: solver2.solve()
-                else: solver2.solve(annotate=False)
-
-        (u2, p2) = self.w2.split()
-        u2.rename("velocidade", "conforme_tempo")
-        p2.rename("pressao", "conforme_tempo")
-        if save_results:
-            self.veloc_file2 << u2
-            self.press_file2 << p2
-
-        self.w2_old = self.w2
-        return self.w2

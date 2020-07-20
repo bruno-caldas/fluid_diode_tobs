@@ -7,13 +7,14 @@ import BrunoDoc.parameters as Par
 import numpy
 import BrunoDoc.tobs as tobs
 import math
+from BrunoDoc.filter_class import filter_obj
 
 from BrunoDoc.read_param_file import *
 
 delta = float(linha[2])
 gap = float(linha[3])
 radius = float(linha[4])
-altura = 1.5
+altura = 2.0
 
 class OP(AProb.AP):
     """
@@ -68,26 +69,15 @@ class OP(AProb.AP):
         self.rho_tst   = TestFunction(self.rho.function_space())
         self.vol_xi  = assemble(self.rho_tst * Constant(1) * dx)
         self.vol_sum = self.vol_xi.sum()
-        self.malhavol_vol_xi  = assemble(self.rho_tst * Constant(1) * self.dxx(1))#x(1))#/(base*altura)
+        self.malhavol_vol_xi  = assemble(self.rho_tst * Constant(1) * dx)#x(1))#/(base*altura)
         self.malhavol_vol_sum = self.malhavol_vol_xi.sum()
-
-    def __vf_fun_var_assem2__(self):
-        rho_tst2   = TestFunction(self.rho.function_space())
-        self.malhavol_vol_xi2  = assemble(rho_tst2 * Constant(1) * self.dxx(2))
-        self.malhavol_vol_sum2 = self.malhavol_vol_xi2.sum()
-
-    def __vf_fun_var_assem3__(self):
-        rho_tst3   = TestFunction(self.rho.function_space())
-        self.malhavol_vol_xi3  = assemble(rho_tst3 * Constant(1) * self.dxx(3))
-        self.malhavol_vol_sum3 = self.malhavol_vol_xi3.sum()
 
     def obj_fun(self, rho, user_data=None):
         print(" \n **********************************" )
         print(" Objective Function Evaluation" )
         ds_vars = self.__check_ds_vars__(rho)
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars)
-        if assemble(funcional2) == 0: fval = 0
-        fval = assemble(funcional1) / assemble(funcional2) + assemble(Fstar)
+        funcional1, w = self.Funcional(ds_vars, save_results=False)
+        fval = assemble(funcional1)
         print(" fval: {}" .format(fval) )
         print(" ********************************** \n " )
         self.iter_fobj += 1
@@ -99,22 +89,15 @@ class OP(AProb.AP):
         self.direita.mark(facet_marker,2)
         dp = Measure("ds",domain=self.mesh,subdomain_data=facet_marker)
         (u,p) = split(w)
-        (u2,p2) = split(w2)
         borda_e = assemble(p*dp(1))/gap
         borda_e0 = assemble(p*dp(2))/gap
-        borda_d0 = assemble(p2*dp(1))/gap
-        borda_d = assemble(p2*dp(2))/gap
         borda_e = borda_e - borda_e0
-        borda_d = borda_d - borda_d0
         print("Esquerda pressao: {}".format(borda_e))
-        print("Direita pressao: {}".format(borda_d))
 
         if self.first_iter:
-            self.file_obj.write("FunObj" +"\t"+ "Visc TermF" + "\t"+ "Visc TermB" +"\t"+ "Fstar" +"\t"+ "Pida" +"\t"+ "Pvolta"+ "\n")
+            self.file_obj.write("FunObj" +"\t"+ "Volume" + "\t"+  "Pida" + "\n")
             self.first_iter = False
-            self.file_obj.write(str(fval) +"\t"+ str(assemble(visc_term1))+ "\t"+ str(assemble(visc_term2)) +"\t"+ str(assemble(Fstar)) +"\t"+ str(borda_e) +"\t"+ str(borda_d) + "\n")
-        else:
-            self.file_obj.write(str(fval) +"\t"+ str(assemble(visc_term1))+ "\t"+ str(assemble(visc_term2)) +"\t"+ str(assemble(Fstar)) +"\t"+ str(borda_e) +"\t"+ str(borda_d) + "\n")
+        self.file_obj.write(str(fval) +"\t"+ str(self.volfrac_fun(rho))+ "\t"+ str(borda_e) + "\n")
         self.file_obj.close()
         #colando aqui
         if math.isnan(fval): fval = 0
@@ -133,30 +116,20 @@ class OP(AProb.AP):
 
         mesh = ds_vars.function_space().mesh()
 
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars) #, self.state, self.state2)
-        w3 = w2.copy(deepcopy=True) #FIXME arrumar aqui
+        # self.filter_f = filter_obj(mesh, rmin=0.3, beta=2)
+        # ds_vars = self.filter_f.Rho_elem(ds_vars)
+        # ds_vars.rename("filtrado", "filtrado")
+        # self.file_filtrado << ds_vars
+
+        funcional1, w = self.Funcional(ds_vars) #, self.state, self.state2)
 
         lam1 = self.get_adjoint_solution(ds_vars, w)
-        lam2 = self.get_adjoint_solution2(ds_vars, w2)
-        lam3 = self.get_adjoint_solution3(ds_vars, w3)
 
         fval1 = assemble(funcional1)
-        fval2 = assemble(funcional2)
         L1 = numpy.array(lam1)
-        L2 = numpy.array(lam2)
-        L3 = numpy.array(lam3)
-
-        self.file_analise = open(self.workdir + "/analise.txt", "a+")
-        self.file_analise.write(str(fval1) + '\t' + str(fval2) + '\t' + str(assemble(Fstar)) + '\t' \
-                + str(assemble(ds_vars*dx)) + '\t'+ str(L1.sum()) + '\t' + str(L2.sum()) +'\t' \
-                + str(L3.sum()) + '\n')
 
         if fval1 ==0: L = 0 * L1
-        elif fval2 ==0: L = 0 * L2
-        # else: L = 2 * L1/fval2 - 1 * L2/fval2
-        else:
-            L = L1/fval2 - 1 *fval1/fval2**2 * L2 + L3
-        L = L1/fval2 - 1 *fval1/fval2**2 * L2 + L3
+        L = L1
         # L = L / (delta*altura + 2*0.5*1)
 
         sensibility = ds_vars.copy(deepcopy=True)
@@ -164,9 +137,9 @@ class OP(AProb.AP):
 
         if self.filter_f is not None: sensibility = self.filter_f.Sens_elem(sensibility)
 
-        for cell in cells(mesh):
-            if (cell.midpoint().x() > delta or cell.midpoint().x() < 0):
-                sensibility.vector()[cell.index()] = L.min()
+        '''for cell in cells(mesh):
+            if (cell.midpoint().y() > 1. - gap):
+                sensibility.vector()[cell.index()] = L.min()'''
 
         sensibility.rename("Sensitivity", "Sensitivity")
         self.file_sen << sensibility
@@ -193,23 +166,17 @@ class OP(AProb.AP):
 
         ds_vars.rename("ControlFiltered", "ControlFiltered")
 
-        random_cells = numpy.random.randint(10, size=(1600))
+        random_cells = numpy.random.randint(1200, size=(10))
         # random_cells = [*range(1600)]
         self.file_analise = open(self.workdir + "/analise.txt", "a+")
         self.file_analise.write(' \t Point Number\tFinite Diference\tSensibility\tError\n')
 
-        ds_vars.vector()[:] = 1
-        funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False)
-        w3 = w2.copy(deepcopy=True)
+        ds_vars.vector()[:] = 0.5
+        funcional1, w = self.Funcional(ds_vars, save_results=False)
         lam1 = self.get_adjoint_solution(ds_vars, w)
-        lam2 = self.get_adjoint_solution2(ds_vars, w2)
-        lam3 = self.get_adjoint_solution3(ds_vars, w3)
-        fval1 = assemble(funcional1)
-        fval2 = assemble(funcional2)
-        fval3 = assemble(Fstar)
-        fval_0 = fval1/fval2 + fval3
+        fval_0 = assemble(funcional1)
 
-        L = lam1/fval2 - 1 *fval1/fval2**2 * lam2 + lam3
+        L = lam1
 
         '''a = TrialFunction(ds_vars.function_space())
         b = TestFunction(ds_vars.function_space())
@@ -225,18 +192,15 @@ class OP(AProb.AP):
         delta_ds_vars = 1e-7
         file_teste = File(self.workdir + "/sens_error.pvd")
         for rcell in random_cells:
-            ds_vars.vector()[rcell] = 1 - delta_ds_vars
-            funcional1, funcional2, visc_term1, visc_term2, Fstar, w, w2 = self.Funcional(ds_vars, save_results=False)
-            fval1 = assemble(funcional1)
-            fval2 = assemble(funcional2)
-            fval3 = assemble(Fstar)
-            fval_1 = fval1/fval2 + fval3
+            ds_vars.vector()[rcell] = 0.5 - delta_ds_vars
+            funcional1, w = self.Funcional(ds_vars, save_results=False)
+            fval_1 = assemble(funcional1)
 
             finite_diference = (fval_0 - fval_1) / delta_ds_vars
             error = (finite_diference-L[rcell])/L[rcell]
             self.file_analise.write('Point ID:\t' +str(rcell) + '\t' + \
                     str(finite_diference) + '\t' + str(L[rcell]) + '\t' + str(error) + '\n')
-            ds_vars.vector()[:] = 1
+            ds_vars.vector()[:] = 0.5
             error_cells.append(error)
             sens.vector()[rcell] = finite_diference
             file_teste << sens
@@ -251,56 +215,21 @@ class OP(AProb.AP):
         self.cst_L.append(lwr)
         self.cst_num += 1
 
-    def add_volf_constraint2(self, upp, lwr):
-        self.cst_U.append(upp)
-        self.cst_L.append(lwr)
-
-        self.cst_num += 1
-
-        self.cst_U = numpy.array(self.cst_U) #Eu q pus isto
-        self.cst_L = numpy.array(self.cst_L) #Eu q pus isto
-    def add_volf_constraint3(self, upp, lwr):
-
-        self.cst_num += 1
-
-        self.cst_U = numpy.append([self.cst_U],[upp]) #Eu q pus isto
-        self.cst_L = numpy.append([self.cst_L],[lwr]) #Eu q pus isto
-
     def volfrac_fun(self, xi):
 
         self.__check_ds_vars__(xi)
         #self.__check_ds_vars__(self.malhavol.vector()[:])
 
-        volume_val = numpy.array(assemble(self.rho_tst * self.rho* self.dxx(1))).sum()
+        volume_val = numpy.array(assemble(self.rho_tst * self.rho* dx)).sum()
         # volume_val = float( self.malhavol_vol_xi.inner( self.rho.vector() ) )
 
         #return volume_val/self.vol_sum
         return volume_val/self.malhavol_vol_sum
 
-    def volfrac_fun2(self, xi):
-
-        #self.__check_ds_vars__(xi)
-        # volume_val2 = float( self.malhavol_vol_xi2.inner( self.rho.vector() ) )
-        volume_val2 = numpy.array(assemble(self.rho_tst * self.rho* self.dxx(2))).sum()
-
-        return volume_val2/self.malhavol_vol_sum2
-
-    def volfrac_fun3(self, xi):
-        # volume_val3 = float( self.malhavol_vol_xi3.inner( self.rho.vector() ) )
-        volume_val3 = numpy.array(assemble(self.rho_tst * self.rho* self.dxx(3))).sum()
-
-        return volume_val3/self.malhavol_vol_sum3
 
     def volfrac_dfun(self, xi=None, user_data=None):
         resultado = self.malhavol_vol_xi/self.malhavol_vol_sum
-        return resultado
-
-    def volfrac_dfun2(self, xi=None, user_data=None):
-        resultado = self.malhavol_vol_xi2/self.malhavol_vol_sum2
-        return resultado
-    def volfrac_dfun3(self, xi=None, user_data=None):
-        resultado = self.malhavol_vol_xi3/self.malhavol_vol_sum3
-        return resultado
+        return numpy.array(resultado)
 
     def flag_jacobian(self):
         rows = []
@@ -315,10 +244,10 @@ class OP(AProb.AP):
     def cst_fval(self, xi, user_data=None):
         if self.cst_num==1:
             cst_val = numpy.array(self.volfrac_fun(xi), dtype=numpy.float).T
-        if self.cst_num==2:
+        '''if self.cst_num==2:
             cst_val = numpy.array([self.volfrac_fun(xi), self.volfrac_fun2(xi)], dtype=numpy.float ).T
         if self.cst_num==3:
-            cst_val = numpy.array([self.volfrac_fun(xi), self.volfrac_fun2(xi), self.volfrac_fun2(xi),self.volfrac_fun3(xi)], dtype=numpy.float ).T
+            cst_val = numpy.array([self.volfrac_fun(xi), self.volfrac_fun2(xi), self.volfrac_fun2(xi),self.volfrac_fun3(xi)], dtype=numpy.float ).T'''
 
         return cst_val
 
@@ -330,15 +259,6 @@ class OP(AProb.AP):
             if self.cst_num==1:
                 print( "CST Value1: ", self.volfrac_fun(xi) )
                 dfval = self.volfrac_dfun()
-            if self.cst_num==2:
-                print( "CST Value1: ", self.volfrac_fun(xi) )
-                print( "CST Value2: ", self.volfrac_fun2(xi) )
-                dfval = numpy.array([ self.volfrac_dfun(), self.volfrac_dfun2() ])
-            if self.cst_num==3:
-                print( "CST Value1: ", self.volfrac_fun(xi) )
-                print( "CST Value2: ", self.volfrac_fun2(xi) )
-                print( "CST Value3: ", self.volfrac_fun3(xi) )
-                dfval = numpy.array([ self.volfrac_dfun(), self.volfrac_dfun2(), self.volfrac_dfun2(), self.volfrac_dfun3() ])
 
         return dfval
 
@@ -390,13 +310,21 @@ class OP(AProb.AP):
             self.iteration = iteration
             # self.rotating_parts = domain
             '''if iteration == 10:
-                self.alphabar.assign(3.33e4)
-            if iteration == 20:
-                self.alphabar.assign(3.33e5)
+                self.alphabar.assign(500)'''
+            '''if iteration == 20:
+                self.alphabar.assign(750)
             if iteration == 30:
-                self.alphabar.assign(3.33e6)
+                self.alphabar.assign(1000)
             if iteration == 40:
-                self.alphabar.assign(3.33e7)'''
+                self.alphabar.assign(2000)
+            if iteration == 50:
+                self.alphabar.assign(4000)'''
+            '''if iteration == 20:
+                self.alphabar.assign(2.5e4)'''
+            '''if iteration == 30:
+                self.alphabar.assign(2.5e5)
+            if iteration == 40:
+                self.alphabar.assign(2.5e6)'''
 
         self.file_mesh_adapted << self.rho.function_space().mesh()
         self.rho.full_geo = self.full_geo

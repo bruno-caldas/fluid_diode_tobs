@@ -80,14 +80,14 @@ class filter_obj(object):
             #mi_e = 0.0
             mi_e = np.dot(ro, we) / np.sum(we)
             self.mi_e.append(mi_e)
-            rho_e[ind] = 1 - exp(-self.beta*mi_e) + mi_e*exp(-self.beta)
-            # rho_e[ind] = exp(-self.beta*mi_e) - mi_e*exp(-self.beta)
+            # rho_e[ind] = 1 - exp(-self.beta*mi_e) + mi_e*exp(-self.beta)
+            rho_e[ind] = exp(-self.beta*mi_e) - mi_e*exp(-self.beta)
 
         rho_e[np.where(rho_e > 1)[0]] = 1
         rho_e[np.where(rho_e < 0)[0]] = 0
 
-        # frho.vector()[:] = 1 - rho_e
-        frho.vector()[:] = rho_e
+        # frho.vector()[:] = rho_e
+        frho.vector()[:] = 1 - rho_e
         return frho
         #######-----------------------------------------------------------------#######
         ###############################################################################
@@ -110,13 +110,13 @@ class filter_obj(object):
 
             if self.mi_e != 0:
                 dmi_e = we / np.sum(we)
-                dgama_dd = self.beta * dmi_e * np.exp(-self.beta*self.mi_e[ind]) + dmi_e * np.exp(-self.beta)
+                # dgama_dd = self.beta * dmi_e * np.exp(-self.beta*self.mi_e[ind]) + dmi_e * np.exp(-self.beta)
+                dgama_dd = - self.beta * dmi_e * np.exp(-self.beta*self.mi_e[ind]) - dmi_e * np.exp(-self.beta)
                 sens[ind] = np.dot(dfdxo, dgama_dd)
-                # sens[ind] = exp(-self.beta*mi_e) + mi_e*exp(-self.beta)
             else:
                 sens[ind] = vetore[ind]
 
-        fsens.vector()[:] = sens
+        fsens.vector()[:] = -sens
         # fsens.vector()[:] = 1 - sens
         # plot(fsens, title='Element Sensitivity',key="Sensitivity")
         return fsens
