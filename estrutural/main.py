@@ -12,13 +12,11 @@ parameters["std_out_all_processes"] = False
 ###############################################################################
 
 
-def estrutural(rho_fenics):
+def estrutural(rho_fenics, altura=1.5, radius=0):
     ###############################################################################
     #######------------------------INITIAL PARAMETERS-----------------------#######
     # nelx   = 50                             # Elements on length
     # nely   = 25                             # Elements on height
-    Height = 1.5                            # Beam height        - mm
-    Width  = 2.0                            # Beam width         - mm
     Eo     = 10.0#*1e3                           # Young's Modulus    - MPa
     nu     = 0.3                            # Poisson's ratio
     u0     = Constant((0.0, 0.0))           # Clamp condition
@@ -43,31 +41,33 @@ def estrutural(rho_fenics):
         I = Identity(v.geometric_dimension())
         return (2*mu*sym(grad(v)) + lmbda*tr(sym(grad(v)))*I)
 
-    class LeftEdge(SubDomain):
+    class UpEdge(SubDomain):
           def inside(self, x, on_boundary):
-                return abs(x[0] - 2.0) < DOLFIN_EPS #and x[1] >= 0.5
+                # return abs(x[0] - 2.0) < DOLFIN_EPS #and x[1] >= 0.5
+                return abs(x[1] - altura) < DOLFIN_EPS #and x[1] >= 0.5
                 # return on_boundary and abs(x[0] - 2.0) < DOLFIN_EPS #and x[1] >= 0.5
 
-    class RightEdge(SubDomain):
+    class DownEdge(SubDomain):
           def inside(self, x, on_boundary):
-                return abs(x[0])  < DOLFIN_EPS #and x[1]>= 0.5
+                # return abs(x[0])  < DOLFIN_EPS #and x[1]>= 0.5
+                return abs(x[1] - radius)  < DOLFIN_EPS #and x[1]>= 0.5
                 # return on_boundary and abs(x[0])  < DOLFIN_EPS #and x[1]>= 0.5
 
-    left_edge = LeftEdge()
-    right_edge = RightEdge()
+    up_edge = UpEdge()
+    down_edge = DownEdge()
 
     sub_domains = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
     sub_domains.set_all(0)
-    right_edge.mark(sub_domains, 1)
-    left_edge.mark(sub_domains, 2)
+    down_edge.mark(sub_domains, 1)
+    up_edge.mark(sub_domains, 2)
     File("apagar.pvd") << sub_domains
 
     ds = Measure("ds")[sub_domains]
 
     #plot(sub_domains)
 
-    bc = DirichletBC(A, u0, left_edge)
-    bc_adj = DirichletBC(A, u0, left_edge)
+    bc = DirichletBC(A, u0, up_edge)
+    bc_adj = DirichletBC(A, u0, up_edge)
 
     ###############################################################################
     #######-----------------------SIMP METHOD-------------------------------#######
@@ -135,5 +135,6 @@ def estrutural(rho_fenics):
     dfval = Jhat.derivative()
     dfval = - np.array(dfval.vector())
 
-    return J, dfval
+    fator = 1e-2
+    return float(J)*fator, dfval*fator
 

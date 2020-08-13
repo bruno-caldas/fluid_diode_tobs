@@ -7,6 +7,7 @@ import BrunoDoc.parameters as Par
 import numpy
 import BrunoDoc.tobs as tobs
 import math
+from estrutural import main as estrut
 
 from BrunoDoc.read_param_file import *
 
@@ -81,6 +82,11 @@ class OP(AProb.AP):
         self.malhavol_vol_xi3  = assemble(rho_tst3 * Constant(1) * self.dxx(3))
         self.malhavol_vol_sum3 = self.malhavol_vol_xi3.sum()
 
+    @staticmethod
+    def estrutural(rho):
+        j, jd = estrut.estrutural(rho.copy(deepcopy=True))
+        return j, jd
+
     def obj_fun(self, rho, user_data=None):
         print(" \n **********************************" )
         print(" Objective Function Evaluation" )
@@ -116,6 +122,9 @@ class OP(AProb.AP):
         self.file_obj.close()
         #colando aqui
         if math.isnan(fval): fval = 0
+
+        j, jd = self.estrutural(ds_vars)
+        fval += j
         return fval# , borda_e
 
     def obj_dfun(self, xi, user_data=None):
@@ -161,7 +170,7 @@ class OP(AProb.AP):
         sensibility.vector().set_local(L)
 
         for cell in cells(mesh):
-            if (cell.midpoint().x() > delta or cell.midpoint().x() < 0):
+            if cell.midpoint().x() > delta or cell.midpoint().x() < 0:# or cell.midpoint().y() < gap:
                 sensibility.vector()[cell.index()] = L.min()
 
         sensibility.rename("Sensitivity", "Sensitivity")
@@ -180,6 +189,8 @@ class OP(AProb.AP):
 
         self.iter_dobj += 1
 
+        j, jd = self.estrutural(ds_vars)
+        L += jd
         return L
 
     def test_obj_dfun(self, xi, user_data=None):
@@ -239,7 +250,6 @@ class OP(AProb.AP):
 
         self.file_analise.close()
 
-        import pdb;pdb.set_trace()
         return error_cells
 
     def add_volf_constraint(self, upp, lwr):
