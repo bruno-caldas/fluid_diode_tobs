@@ -99,6 +99,7 @@ class TobsObj():
 
     def solve(self, rho, minimize=True, filter_fun=None, call_back=post_evaluation):
         flip_limits = 0.0001525
+        flip_limits = 0.1
         self.j_previous = None
         while True:
             self.control = np.copy(rho.vector())
@@ -110,7 +111,7 @@ class TobsObj():
             self.reshape_to_matlab()
             self.volume_constraint = np.array([self.acst_L[0], self.acst_L[1], self.acst_U[1], self.acst_L[2]])
             # ep = 0.00001 # 12
-            ep = 0.02 # 12
+            ep = 0.2 # 12
             self.epsilons = np.array([ep, ep, ep, ep]) #O benchmarking estava em 0.2
             ans = octave.tobs_from_matlab(
                     self.nvar,

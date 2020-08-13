@@ -110,11 +110,9 @@ class OP(AProb.AP):
         print("Direita pressao: {}".format(borda_d))
 
         if self.first_iter:
-            self.file_obj.write("FunObj" +"\t"+ "Visc TermF" + "\t"+ "Visc TermB" +"\t"+ "Fstar" +"\t"+ "Pida" +"\t"+ "Pvolta"+ "\n")
+            self.file_obj.write("FunObj" +"\t"+ "Volume" + "\t"+ "Fstar" +"\t"+ "Pida" +"\t"+ "Pvolta"+ "\n")
             self.first_iter = False
-            self.file_obj.write(str(fval) +"\t"+ str(assemble(visc_term1))+ "\t"+ str(assemble(visc_term2)) +"\t"+ str(assemble(Fstar)) +"\t"+ str(borda_e) +"\t"+ str(borda_d) + "\n")
-        else:
-            self.file_obj.write(str(fval) +"\t"+ str(assemble(visc_term1))+ "\t"+ str(assemble(visc_term2)) +"\t"+ str(assemble(Fstar)) +"\t"+ str(borda_e) +"\t"+ str(borda_d) + "\n")
+        self.file_obj.write(str(fval) +"\t"+ str(assemble(self.rho*self.dxx(2))/3*100)+ "\t"+ str(assemble(Fstar)) +"\t"+ str(borda_e) +"\t"+ str(borda_d) + "\n")
         self.file_obj.close()
         #colando aqui
         if math.isnan(fval): fval = 0
@@ -161,8 +159,6 @@ class OP(AProb.AP):
 
         sensibility = ds_vars.copy(deepcopy=True)
         sensibility.vector().set_local(L)
-
-        if self.filter_f is not None: sensibility = self.filter_f.Sens_elem(sensibility)
 
         for cell in cells(mesh):
             if (cell.midpoint().x() > delta or cell.midpoint().x() < 0):
@@ -389,9 +385,9 @@ class OP(AProb.AP):
             self.file_out << rho_opt
             self.iteration = iteration
             # self.rotating_parts = domain
-            '''if iteration == 10:
-                self.alphabar.assign(3.33e4)
-            if iteration == 20:
+            '''if iteration == 30:
+                self.alphabar.assign(2.5e4)'''
+            '''if iteration == 20:
                 self.alphabar.assign(3.33e5)
             if iteration == 30:
                 self.alphabar.assign(3.33e6)

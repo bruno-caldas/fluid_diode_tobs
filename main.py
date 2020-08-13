@@ -23,11 +23,11 @@ if __name__ == "__main__":
     OPTIM_1.omega = float(linha[1])/60*2*3.1415
     OPTIM_1.diodicidade = True
     V_U1 = 1.0#*base*altura PORCENTAGEM DE FLUIDO SEMPRE
-    V_L1 = 0.85#*base*altura
+    V_L1 = 0.0#*base*altura
     V_U2 = float(linha[5])#*base*altura
     V_L2 = float(linha[6])#*base*altura
     V_U3 = 1.0#*base*altura
-    V_L3 = 0.85#*base*altura
+    V_L3 = 0.0#*base*altura
     OPTIM_1.r_min = float(linha[10])
     # OPTIM_1.alphabar = 2.5 * OPTIM_1.mu * 1e-6 * float(linha[7])    # kg/ (m**3 *s)
     # OPTIM_1.alphaJbar = 2.5 * OPTIM_1.mu * 1e-6 * float(linha[8])    # kg/ (m**3 *s)

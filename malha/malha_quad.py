@@ -11,20 +11,20 @@ def poprow(my_array,pr):
     new_array = np.vstack((my_array[:i],my_array[i+1:]))
     return [new_array,pop]
 
-def generate_quad_mesh(N):
+def generate_quad_mesh(N, radius=0, delta=2):
     mesh = Mesh()
     editor = MeshEditor()
     editor.open(mesh, 'quadrilateral', 2,2)
 
-    ptos_x = np.linspace(-1, 3, 8*N + 1)
-    ptos_y = np.linspace(0, 1.5, 3*N + 1)
+    ptos_x = np.linspace(-1, delta+1, int((delta+2)*2*N+1))
+    ptos_y = np.linspace(0+radius, 1.5+radius, 3*N + 1)
     out_1x, out_1y = np.meshgrid(
                         np.linspace(-1, 0, 2*N, endpoint=False),
-                        np.linspace(1.5, 0.5, 2*N, endpoint=False)
+                        np.linspace(1.5+radius, 0.5+radius, 2*N, endpoint=False)
                         )
     out_2x, out_2y = np.meshgrid(
-                        np.linspace(3, 2, 2*N, endpoint=False),
-                        np.linspace(1.5, 0.5, 2*N, endpoint=False)
+                        np.linspace(delta+1, delta, 2*N, endpoint=False),
+                        np.linspace(1.5+radius, 0.5+radius, 2*N, endpoint=False)
                         )
     out_1 = np.round(np.array([out_1x.flatten(), out_1y.flatten()]).T, 10)
     out_2 = np.round(np.array([out_2x.flatten(), out_2y.flatten()]).T, 10)
@@ -43,7 +43,7 @@ def generate_quad_mesh(N):
         pontos = poprow(pontos, point_out)[0]
 
     nvertices = len(pontos)
-    ncells = 8*N * 3*N - len(out_1x)*len(out_1y) - len(out_2x)*len(out_2y)
+    ncells = int(delta+2)*2*N * 3*N - len(out_1x)*len(out_1y) - len(out_2x)*len(out_2y)
     editor.init_vertices(nvertices)
     editor.init_cells(ncells)
 

@@ -74,13 +74,14 @@ class PP:
     #rho_eq = 2.696373e-6 #Exemplo do Breda
     rho_eq = 1.
     mu = Constant(1.0)
-    # seq_mu = [10, 5, 3, 2, 1.5, 1.3, 1.2]#, 1.15, 1.1, float(mu)]
+    # seq_mu = [10, 5, 3, 2, 1.5, 1.3, 1.2, 1.15, 1.1, float(mu)]
     seq_mu = [float(mu)]
     alphaunderbar = 0.
     alphabar = 2.5 * mu * 1e6 * 1e-6    # kg/ (m**3 *s)
     alphaJbar = 2.5 * mu * 1e6 * 1e-6    # kg/ (m**3 *s)
-    q = Constant(1.0e5) # q value that controls difficulty/discrete-valuedness of solution
-    # q = Constant(0.001) # aqui da ruim (quadriculado)
+    # q = Constant(1.0e5) # q value that controls difficulty/discrete-valuedness of solution
+    # q = Constant(0.01) # q value that controls difficulty/discrete-valuedness of solution
+    q = Constant(1.0) # q value that controls difficulty/discrete-valuedness of solution
     r_min = 0.05
 
     delta = delta # 2 - 2*0.25
@@ -148,7 +149,7 @@ class PP:
             if linha[9].upper()[:2] == 'DA': mesh = Mesh(generate_mesh(vertices, self.N))
             # else: mesh = generate_mesh(vertices, self.N)
             # else: mesh = ma.valve(delta, self.N)
-            else: mesh = ma.generate_quad_mesh(int(self.N/2))
+            else: mesh = ma.generate_quad_mesh(int(self.N/2), delta=delta)
             (self.z_n, self.r_n) = SpatialCoordinate(mesh)
             self.nr = 1
             self.nz = 0
