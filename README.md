@@ -20,7 +20,7 @@ Renato Picelli (University of São Paulo), rpicelli@usp.br;
 4. Octave to read the .m files;
 5. CPlex* for Integer optimization.
 
-*Unfortunately this one is proprietary to IBM, however there is an free student version available.
+*This dependency is proprietary to IBM, however there is an free student version available.
 
 ## How to use:
 
